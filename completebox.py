@@ -1,6 +1,10 @@
+#!/bin/env python
+
 import logging
 import sys
 import re
+
+from subprocess import check_output
 
 import PyQt5
 from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
@@ -15,6 +19,8 @@ logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 30
 MAX_TICKET_LEN = 6
+CANDIDATES_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/rt.candidates.tsv'
+ICON_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/completebox.png'
 RX_SPACES = re.compile(r'\s+')
 
 
@@ -65,12 +71,13 @@ class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
 
+        self.ticket = None
         self.app = app
 
         self.comboxBox = QComboBox(self)
         self.comboxBox.setEditable(True)
         # self.comboxBox.setCom
-        self.comboxBox.addItems(slurp_lines('./rt.candidates.tsv'))
+        self.comboxBox.addItems(slurp_lines(CANDIDATES_FILENAME))
         self.comboxBox.setMaximumWidth(WINDOW_WIDTH)
         self.comboxBox.setCurrentText('')
 
@@ -103,7 +110,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle('CompleteBox')
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
-        self.setWindowIcon(QIcon('completebox.png'))
+        self.setWindowIcon(QIcon(ICON_FILENAME))
 
         self.center()
         self.show()
@@ -121,16 +128,33 @@ class MainWindow(QWidget):
         if e.key() == Qt.Key_Escape:
             self.close()
         elif e.key() == Qt.Key_Return:
-            ticket = self.extractTicketNumber()
-            logging.info('ticket: %s', ticket)
+            self.ticket = self.extractTicketNumber()
+            logging.info('ticket: %s', self.ticket)
             self.close()
+
+
+class XdoTool:
+    def get_active_window(self):
+        output = check_output(['xdotool', 'getactivewindow'])
+        return output.decode('utf8').strip()
+
+    def send_text(self, window, text):
+        check_output(['xdotool', 'windowfocus', '--sync', window, 'type', text])
 
 
 if __name__ == '__main__':
     logging.info('START')
 
+    xdo = XdoTool()
+    active_window = xdo.get_active_window()
+    logging.info('active window: >%s<', active_window)
+
     app = QApplication(sys.argv)
     window = MainWindow(app)
     result = app.exec()
 
-    logging.info('DONE: %s', result)
+    logging.info('DONE: %s', window.ticket)
+
+    if window.ticket is not None:
+        logging.info('sending to window %s: %s', active_window, window.ticket)
+        xdo.send_text(active_window, window.ticket)
