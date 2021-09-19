@@ -248,9 +248,6 @@ class MainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    # def extractTicketNumber(self):
-    #     return self.comboxBox.currentText()[:MAX_TICKET_LEN]
-
     def set_text(self, text):
         self.browser.setText(text)
 
@@ -269,10 +266,6 @@ class MainWindow(QWidget):
                 first = article.parts[0]
                 self.set_text(first.inflection.html)
 
-            #self.ticket =  #self.extractTicketNumber()
-            #logging.info('word: %s', self.word)
-            #self.close()
-
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
             self.show()
@@ -286,24 +279,6 @@ class XdoTool:
     def send_text(self, window, text):
         check_output(['xdotool', 'windowfocus',
                       '--sync', window, 'type', text])
-
-# TODO:
-# * open ticket in xdg-open when pressed Ctrl-Enter
-# * highlight matches
-# * try doing the same using console/fzf
-# * put window above center vertically, not in the middle
-
-
-# class SystemTrayIcon(QSystemTrayIcon):
-#     def __init__(self, icon, parent=None):
-#         QSystemTrayIcon.__init__(self, icon, parent)
-#         menu = QMenu(parent)
-#         exitAction = menu.addAction("Exit")
-#         self.setContextMenu(menu)
-#         QObject.connect(exitAction, SIGNAL('triggered()'), self.exit)
-#
-#     def exit(self):
-#         QApplication.exit()
 
 
 if __name__ == '__main__':
@@ -332,9 +307,3 @@ if __name__ == '__main__':
     tray.show()
 
     result = app.exec()
-
-    #logging.info('DONE: %s', window.word)
-
-    # if window.ticket is not None:
-    #     logging.info('sending to window %s: %s', active_window, window.ticket)
-    #     xdo.send_text(active_window, window.ticket)
