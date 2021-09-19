@@ -1,6 +1,63 @@
 #!/usr/bin/env python
 
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.request import urlopen
+from threading import Thread
+
+
+class WatchDogServer(HTTPServer):
+    class RequestHandler(BaseHTTPRequestHandler):
+        def __init__(self, request, client_address, server):
+            BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+            self.server = server
+        def do_POST(self):
+            print('showing main window')
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'OK')
+            self.server.on_show()
+    def __init__(self, host, port, on_show):
+        HTTPServer.__init__(self, (host, port), WatchDogServer.RequestHandler)
+        self.host = host
+        self.port = port
+        self.on_show = on_show
+
+
+class WatchDog:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.server = None
+        self.thread = None
+        self.on_show_callback = None
+    def start(self):
+        try:
+            self.server = WatchDogServer(self.host, self.port, self._call_on_show)
+            self.thread = Thread(target=self.server.serve_forever, daemon=True)
+            self.thread.start()
+            return True
+        except OSError:
+            return False
+    def show(self):
+        print('Watchdog already running, showing previous instance')
+        with urlopen(self.get_show_url(), b'') as r:
+            r.read()
+    def get_show_url(self):
+        return 'http://{0}:{1}/'.format(self.host, self.port)
+    def _call_on_show(self):
+        self.on_show_callback()
+    def observe(self, on_show):
+        self.on_show_callback = on_show
+
+
+HOST = 'localhost'
+PORT = 5650
+dog = WatchDog(HOST, PORT)
+if not dog.start():
+    dog.show()
+    sys.exit()
+
 # print('EARLY')
 # sys.exit(1)
 
@@ -242,6 +299,12 @@ class MainWindow(QWidget):
         self.center()
         self.show()
 
+    def activate(self):
+        self.center()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def center(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
@@ -254,6 +317,8 @@ class MainWindow(QWidget):
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
             self.hide()
+        elif (e.key() == Qt.Key_Q) and (e.modifiers() == Qt.ControlModifier):
+            self.close()
         elif e.key() == Qt.Key_Return:
             self.word = self.comboxBox.currentText()
             logging.info('fetch "%s"', self.word)
@@ -282,8 +347,6 @@ class XdoTool:
 
 
 if __name__ == '__main__':
-    logging.info('START')
-
     xdo = XdoTool()
     active_window = xdo.get_active_window()
     logging.info('active window: >%s<', active_window)
@@ -305,5 +368,7 @@ if __name__ == '__main__':
     tray.setContextMenu(menu)
     tray.activated.connect(window.onTrayActivated)
     tray.show()
+
+    dog.observe(window.activate)
 
     result = app.exec()
