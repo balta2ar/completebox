@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
-import logging
 import sys
+# print('EARLY')
+# sys.exit(1)
+
+import logging
 import re
 import bz2
 from os import makedirs
@@ -14,9 +17,10 @@ from bs4 import BeautifulSoup
 
 #import PyQt5
 from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
-                             QWidget, QDesktopWidget, QCompleter, QTextBrowser)
+                             QWidget, QDesktopWidget, QCompleter, QTextBrowser,
+                             QSystemTrayIcon, QMenu, QAction)
 from PyQt5.QtGui import QIcon, QFont, QStandardItemModel
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer
+from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer, QObject
 
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.DEBUG)
@@ -229,7 +233,7 @@ class MainWindow(QWidget):
         mainLayout.addWidget(self.browser)
         self.setLayout(mainLayout)
 
-        self.setWindowTitle('CompleteBox')
+        self.setWindowTitle('OrdbokUibNo')
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setWindowIcon(QIcon(ICON_FILENAME))
 
@@ -252,7 +256,7 @@ class MainWindow(QWidget):
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
-            self.close()
+            self.hide()
         elif e.key() == Qt.Key_Return:
             self.word = self.comboxBox.currentText()
             logging.info('fetch "%s"', self.word)
@@ -268,6 +272,10 @@ class MainWindow(QWidget):
             #self.ticket =  #self.extractTicketNumber()
             #logging.info('word: %s', self.word)
             #self.close()
+
+    def onTrayActivated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self.show()
 
 
 class XdoTool:
@@ -286,6 +294,18 @@ class XdoTool:
 # * put window above center vertically, not in the middle
 
 
+# class SystemTrayIcon(QSystemTrayIcon):
+#     def __init__(self, icon, parent=None):
+#         QSystemTrayIcon.__init__(self, icon, parent)
+#         menu = QMenu(parent)
+#         exitAction = menu.addAction("Exit")
+#         self.setContextMenu(menu)
+#         QObject.connect(exitAction, SIGNAL('triggered()'), self.exit)
+#
+#     def exit(self):
+#         QApplication.exit()
+
+
 if __name__ == '__main__':
     logging.info('START')
 
@@ -295,6 +315,22 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     window = MainWindow(app)
+
+    tray = QSystemTrayIcon(QIcon(dirname(__file__)+'/ordbok_uib_no.png'), app)
+    menu = QMenu()
+    show = QAction('Show')
+    hide = QAction('Hide')
+    quit = QAction('Quit')
+    show.triggered.connect(window.show)
+    hide.triggered.connect(window.hide)
+    quit.triggered.connect(window.close)
+    menu.addAction(show)
+    menu.addAction(hide)
+    menu.addAction(quit)
+    tray.setContextMenu(menu)
+    tray.activated.connect(window.onTrayActivated)
+    tray.show()
+
     result = app.exec()
 
     #logging.info('DONE: %s', window.word)
