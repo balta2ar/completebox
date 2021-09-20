@@ -83,9 +83,9 @@ FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 
-WINDOW_WIDTH = 1000
+WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 30
-MIN_HEIGHT = 500
+MIN_HEIGHT = 800
 MAX_TICKET_LEN = 6
 # CANDIDATES_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/rt.candidates.tsv'
 # ICON_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/completebox.png'
@@ -94,6 +94,30 @@ ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
 RX_SPACES = re.compile(r'\s+')
 ADD_TO_FONT_SIZE = 6
 
+STYLE = '''
+<style>
+th {
+    font-family: "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    color: #557FBD;
+    border-right: 1px solid #557FBD;
+    border-bottom: 1px solid #557FBD;
+    border-top: 1px solid #557FBD;
+    text-align: center;
+    padding: 6px 6px 6px 12px;
+}
+
+td {
+    font-family: "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+    color: #557FBD;
+    border-right: 1px solid #557FBD;
+    border-bottom: 1px solid #557FBD;
+    background: #fff;
+    padding: 6px 6px 6px 12px;
+    text-align: center;
+}
+</style>
+'''
 HTML = '''
 <div id="41772"><table class="paradigmetabell" cellspacing="0" style="margin: 25px;"><tbody><tr><th class="nobgnola"><span class="grunnord">liv</span></th><th class="nola" colspan="2">Entall</th><th class="nola" colspan="2">Flertall</th></tr><tr><th class="nobg">&nbsp;&nbsp;</th><th>Ubestemt form</th><th>Bestemt form</th><th>Ubestemt form</th><th>Bestemt form</th></tr><tr id="41772_1"><td class="ledetekst">n1</td><td class="vanlig">et liv</td><td class="vanlig">livet</td><td class="vanlig">liv</td><td class="vanlig">liva</td></tr><tr id="41772_2"><td class="ledetekst">n1</td><td class="vanlig">et liv</td><td class="vanlig">livet</td><td class="vanlig">liv</td><td class="vanlig">livene</td></tr></tbody></table></div>
 '''
@@ -277,7 +301,7 @@ class MainWindow(QWidget):
         # self.comboxBox.setCompleter(self.completer)
 
         self.browser = QTextBrowser(self)
-        self.browser.setText(HTML)
+        self.browser.setText(STYLE + HTML)
         self.browser.setMinimumHeight(MIN_HEIGHT)
         self.browser.show()
 
@@ -313,7 +337,7 @@ class MainWindow(QWidget):
         self.move(qr.topLeft())
 
     def set_text(self, text):
-        self.browser.setText(text)
+        self.browser.setText(STYLE + text)
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
