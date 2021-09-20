@@ -202,6 +202,7 @@ class Article:
         logging.info('parts: %s', parts)
 
         self.parts = parts
+        self.html = ''.join([x.inflection.html for x in self.parts])
 
     def get_url(self, word: str) -> str:
         return 'https://ordbok.uib.no/perl/ordbok.cgi?OPP={0}&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal'.format(word)
@@ -319,6 +320,9 @@ class MainWindow(QWidget):
             self.hide()
         elif (e.key() == Qt.Key_Q) and (e.modifiers() == Qt.ControlModifier):
             self.close()
+        elif (e.key() == Qt.Key_L) and (e.modifiers() == Qt.ControlModifier):
+            self.comboxBox.lineEdit().selectAll()
+            self.comboxBox.setFocus()
         elif e.key() == Qt.Key_Return:
             self.word = self.comboxBox.currentText()
             logging.info('fetch "%s"', self.word)
@@ -328,8 +332,7 @@ class MainWindow(QWidget):
             print(article)
 
             if article.parts:
-                first = article.parts[0]
-                self.set_text(first.inflection.html)
+                self.set_text(article.html)
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
