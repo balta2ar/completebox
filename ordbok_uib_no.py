@@ -221,6 +221,15 @@ class PartOfSpeech:
         return f'PartOfSpeech(name="{self.name}", lid={self.lid}, inflection={self.inflection})'
 
 
+def to_text(html):
+    return BeautifulSoup(html, features='lxml').text
+
+
+def uniq(items, key):
+    seen = set()
+    return [x for x in items if not (key(x) in seen or seen.add(key(x)))]
+
+
 class Article:
     def __init__(self, client, word):
         soup = BeautifulSoup(client.get(self.get_url(word)), features='lxml')
@@ -229,7 +238,8 @@ class Article:
         logging.info('parts: %s', parts)
 
         self.parts = parts
-        self.html = ''.join([x.inflection.html for x in self.parts])
+        htmls = uniq([x.inflection.html for x in self.parts], to_text)
+        self.html = ''.join(htmls)
 
     def get_url(self, word: str) -> str:
         return 'https://ordbok.uib.no/perl/ordbok.cgi?OPP={0}&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal'.format(word)
