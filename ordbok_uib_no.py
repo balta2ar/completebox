@@ -87,6 +87,7 @@ WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 30
 MIN_HEIGHT = 800
 MAX_TICKET_LEN = 6
+UPDATE_DELAY = 500
 # CANDIDATES_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/rt.candidates.tsv'
 # ICON_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/completebox.png'
 CANDIDATES_FILENAME = dirname(__file__) + '/rt.candidates.tsv'
@@ -295,6 +296,7 @@ class MainWindow(QWidget):
         #self.comboxBox.addItems(slurp_lines(CANDIDATES_FILENAME))
         self.comboxBox.setMaximumWidth(WINDOW_WIDTH)
         self.comboxBox.setCurrentText('')
+        self.comboxBox.currentTextChanged.connect(self.onTextChanged)
 
         # self.custom_filter = ExactMultipartFilterModel(self)
         # self.custom_filter.setSourceModel(self.comboxBox.model())
@@ -354,6 +356,14 @@ class MainWindow(QWidget):
     def set_text(self, text):
         self.browser.setText(STYLE + text)
 
+    def onTextChanged(self, text):
+        if text != '':
+            QTimer.singleShot(UPDATE_DELAY, lambda: self.update(text))
+
+    def update(self, old_text):
+        if self.text() == old_text:
+            self.fetch(old_text)
+
     # def eventFilter(self, obj, e):
     #     if e.type() == QEvent.KeyPress:
     #         print('key press filter')
@@ -373,15 +383,20 @@ class MainWindow(QWidget):
             self.comboxBox.lineEdit().selectAll()
             self.comboxBox.setFocus()
         elif e.key() == Qt.Key_Return:
-            self.word = self.comboxBox.currentText()
-            logging.info('fetch "%s"', self.word)
+            self.fetch(self.text())
 
-            client = CachedHttpClient(HttpClient(), 'cache')
-            article = Article(client, self.word)
-            print(article)
+    def text(self):
+        return self.comboxBox.currentText()
 
-            if article.parts:
-                self.set_text(article.html)
+    def fetch(self, word):
+        logging.info('fetch "%s"', word)
+
+        client = CachedHttpClient(HttpClient(), 'cache')
+        article = Article(client, word)
+        print(article)
+
+        if article.parts:
+            self.set_text(article.html)
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
