@@ -76,8 +76,8 @@ from bs4 import BeautifulSoup
 from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
                              QWidget, QDesktopWidget, QCompleter, QTextBrowser,
                              QSystemTrayIcon, QMenu, QAction)
-from PyQt5.QtGui import QIcon, QFont, QStandardItemModel
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer, QObject
+from PyQt5.QtGui import QIcon, QFont, QStandardItemModel, QKeyEvent
+from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer, QObject, QEvent
 
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.DEBUG)
@@ -106,7 +106,6 @@ th {
     text-align: center;
     padding: 6px 6px 6px 12px;
 }
-
 td {
     font-family: "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
     color: #557FBD;
@@ -195,7 +194,10 @@ class Inflection:
     #  <div id="41772"><table class="paradigmetabell" cellspacing="0" style="margin: 25px;"><tr><th class="nobgnola"><span class="grunnord">liv</span></th><th class="nola" colspan="2">Entall</th><th class="nola" colspan="2">Flertall</th></tr><tr><th class="nobg">&nbsp;&nbsp;</th><th>Ubestemt form</th><th>Bestemt form</th><th>Ubestemt form</th><th>Bestemt form</th></tr><tr id="41772_1"><td class="ledetekst">n1</td><td class="vanlig">et liv</td><td class="vanlig">livet</td><td class="vanlig">liv</td><td class="vanlig">liva</td></tr><tr id="41772_2"><td class="ledetekst">n1</td><td class="vanlig">et liv</td><td class="vanlig">livet</td><td class="vanlig">liv</td><td class="vanlig">livene</td></tr></table></div>
     def __init__(self, client, lid):
         self.lid = lid
-        self.html = client.get(self.get_url(lid))
+        self.html = self.cleanup(client.get(self.get_url(lid)))
+
+    def cleanup(self, text):
+        return re.sub(r'style="margin:[^"]*"', 'style="margin: 3px;"', text)
 
     def get_url(self, lid):
         return 'https://ordbok.uib.no/perl/bob_hente_paradigme.cgi?lid={0}'.format(lid)
@@ -271,11 +273,21 @@ class ExactMultipartFilterModel(QSortFilterProxyModel):
         return found
 
 
+# class CustomKeysQComboBox(QComboBox):
+#     def keyPressEvent(self, e):
+#         if e.key() == Qt.Key_PageUp:
+#             print('page up')
+#             self.parent.keyPressEvent(e)
+#         elif e.key() == Qt.Key_PageDown:
+#             print('page down')
+#             self.parent.keyPressEvent(e)
+#         else:
+#             super(CustomKeysQComboBox, self).keyPressEvent(e)
+
+
 class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
-
-        self.ticket = None
         self.app = app
 
         self.comboxBox = QComboBox(self)
@@ -323,12 +335,15 @@ class MainWindow(QWidget):
 
         self.center()
         self.show()
+        # self.installEventFilter(self)
 
     def activate(self):
         self.center()
         self.show()
         self.raise_()
         self.activateWindow()
+        self.comboxBox.lineEdit().selectAll()
+        self.comboxBox.setFocus()
 
     def center(self):
         qr = self.frameGeometry()
@@ -339,9 +354,19 @@ class MainWindow(QWidget):
     def set_text(self, text):
         self.browser.setText(STYLE + text)
 
+    # def eventFilter(self, obj, e):
+    #     if e.type() == QEvent.KeyPress:
+    #         print('key press filter')
+    #         return True
+    #     return super().eventFilter(obj, e)
+
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
             self.hide()
+        # if e.key() == Qt.Key_PageUp:
+        #     print('PARENT page up')
+        # elif e.key() == Qt.Key_PageDown:
+        #     print('PARENT page down')
         elif (e.key() == Qt.Key_Q) and (e.modifiers() == Qt.ControlModifier):
             self.close()
         elif (e.key() == Qt.Key_L) and (e.modifiers() == Qt.ControlModifier):
