@@ -6,25 +6,23 @@ from urllib.request import urlopen
 from threading import Thread
 
 
-class WatchDogServer(HTTPServer):
-    class RequestHandler(BaseHTTPRequestHandler):
-        def __init__(self, request, client_address, server):
-            BaseHTTPRequestHandler.__init__(self, request, client_address, server)
-            self.server = server
-        def do_POST(self):
-            print('showing main window')
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b'OK')
-            self.server.on_show()
-    def __init__(self, host, port, on_show):
-        HTTPServer.__init__(self, (host, port), WatchDogServer.RequestHandler)
-        self.host = host
-        self.port = port
-        self.on_show = on_show
-
-
 class WatchDog:
+    class Server(HTTPServer):
+        class RequestHandler(BaseHTTPRequestHandler):
+            def __init__(self, request, client_address, server):
+                BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+                self.server = server
+            def do_POST(self):
+                print('showing main window')
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+                self.server.on_show()
+        def __init__(self, host, port, on_show):
+            HTTPServer.__init__(self, (host, port), WatchDog.Server.RequestHandler)
+            self.host = host
+            self.port = port
+            self.on_show = on_show
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -33,7 +31,7 @@ class WatchDog:
         self.on_show_callback = None
     def start(self):
         try:
-            self.server = WatchDogServer(self.host, self.port, self._call_on_show)
+            self.server = WatchDog.Server(self.host, self.port, self._call_on_show)
             self.thread = Thread(target=self.server.serve_forever, daemon=True)
             self.thread.start()
             return True
@@ -58,9 +56,6 @@ if not dog.start():
     dog.show()
     sys.exit()
 
-# print('EARLY')
-# sys.exit(1)
-
 import logging
 import re
 import bz2
@@ -72,7 +67,6 @@ from subprocess import check_output
 from requests import get
 from bs4 import BeautifulSoup
 
-#import PyQt5
 from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
                              QWidget, QDesktopWidget, QCompleter, QTextBrowser,
                              QSystemTrayIcon, QMenu, QAction)
@@ -84,13 +78,9 @@ logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 
 WINDOW_WIDTH = 1300
-WINDOW_HEIGHT = 30
-MIN_HEIGHT = 800
-MAX_TICKET_LEN = 6
+WINDOW_HEIGHT = 800
+#MIN_HEIGHT = 800
 UPDATE_DELAY = 500
-# CANDIDATES_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/rt.candidates.tsv'
-# ICON_FILENAME = '/mnt/big_ext4/btsync/prg/completebox/completebox.png'
-CANDIDATES_FILENAME = dirname(__file__) + '/rt.candidates.tsv'
 ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
 RX_SPACES = re.compile(r'\s+')
 ADD_TO_FONT_SIZE = 6
@@ -171,16 +161,6 @@ def spit(do_open, filename, content):
         file_.write(content.encode())
 
 
-def slurp_lines(filename):
-    lines = []
-    with open(filename) as file_:
-        for line in file_.readlines():
-            # Take 2 first columns max separated by Tab
-            line = ' '.join(line.strip().split('\t')[:2])
-            lines.append(line)
-    return lines
-
-
 class Suggestions:
     pass
     # https://ordbok.uib.no/perl/lage_ordliste_liten_nr2000.cgi?spr=bokmaal&query=gam
@@ -250,51 +230,6 @@ class Article:
     # <span class="oppslagsord b" id="22720">gi</span>
     # <span class="oppsgramordklasse" onclick="vise_fullformer(&quot;8225&quot;,'bob')">adj.</span>
 
-class ExactMultipartFilterModel(QSortFilterProxyModel):
-    """
-    This model is used to filter view by a pattern that contains words,
-    separated with spaces. Each word of the pattern should be present in a row.
-    """
-
-    def __init__(self, parent):
-        super(ExactMultipartFilterModel, self).__init__(parent)
-        self._filteringRegExp = None
-
-    def setFilterString(self, text):
-        # pattern = text.toLower().replace(QRegExp(r"\s+"), ".*")
-        pattern = RX_SPACES.sub('.*', text)
-        # pattern = text.lower().replace(QRegExp(r"\s+"), ".*")
-        # self._filteringRegExp = QRegExp(pattern, Qt.CaseInsensitive)
-        self._filteringRegExp = re.compile(pattern, re.IGNORECASE)
-        logging.info('new pattern: %s', pattern)
-        self.invalidateFilter()
-
-    def filterAcceptsRow(self, intSourceRow, sourceParent):
-        if self._filteringRegExp is None:
-            return False
-
-        index0 = self.sourceModel().index(intSourceRow, 0, sourceParent)
-        data = self.sourceModel().data(index0)
-        # logging.info('data line: %s', data)
-        # data = self.sourceModel().data(index0).toString()
-        # return data.contains(self._filteringRegExp)
-        found = self._filteringRegExp.search(data) != None
-        # if found:
-        # logging.info('found: %s', data)
-        return found
-
-
-# class CustomKeysQComboBox(QComboBox):
-#     def keyPressEvent(self, e):
-#         if e.key() == Qt.Key_PageUp:
-#             print('page up')
-#             self.parent.keyPressEvent(e)
-#         elif e.key() == Qt.Key_PageDown:
-#             print('page down')
-#             self.parent.keyPressEvent(e)
-#         else:
-#             super(CustomKeysQComboBox, self).keyPressEvent(e)
-
 
 class MainWindow(QWidget):
     def __init__(self, app):
@@ -303,38 +238,23 @@ class MainWindow(QWidget):
 
         self.comboxBox = QComboBox(self)
         self.comboxBox.setEditable(True)
-        #self.comboxBox.addItems(slurp_lines(CANDIDATES_FILENAME))
         self.comboxBox.setMaximumWidth(WINDOW_WIDTH)
         self.comboxBox.setCurrentText('')
         self.comboxBox.currentTextChanged.connect(self.onTextChanged)
-
-        # self.custom_filter = ExactMultipartFilterModel(self)
-        # self.custom_filter.setSourceModel(self.comboxBox.model())
-        # self.comboxBox.lineEdit().textEdited.connect(
-        #     self.custom_filter.setFilterString)
 
         font = QFont()
         font.setPointSize(font.pointSize() + ADD_TO_FONT_SIZE)
         self.comboxBox.setFont(font)
 
-        # self.completer = QCompleter(self.comboxBox.model(), self.comboxBox)
-        # self.completer.setModel(self.custom_filter)
-        # self.completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
-        # self.completer.popup().setFont(font)
-        #
-        # self.comboxBox.setCompleter(self.completer)
-
         self.browser = QTextBrowser(self)
         self.browser.setText(STYLE + HTML)
-        self.browser.setMinimumHeight(MIN_HEIGHT)
+        self.browser.setMinimumWidth(WINDOW_WIDTH)
+        self.browser.setMinimumHeight(WINDOW_HEIGHT)
         self.browser.show()
 
         mainLayout = QVBoxLayout(self)
-        # mainLayout.addStretch(1)
         mainLayout.setSpacing(0)
-        # mainLayout.setMargin(0)
         mainLayout.setContentsMargins(0, 0, 0, 0)
-        # mainLayout.setMar
         mainLayout.addWidget(self.comboxBox)
         mainLayout.addWidget(self.browser)
         self.setLayout(mainLayout)
@@ -347,7 +267,6 @@ class MainWindow(QWidget):
 
         self.center()
         self.show()
-        # self.installEventFilter(self)
 
     def activate(self):
         self.center()
@@ -374,19 +293,9 @@ class MainWindow(QWidget):
         if self.text() == old_text:
             self.fetch(old_text)
 
-    # def eventFilter(self, obj, e):
-    #     if e.type() == QEvent.KeyPress:
-    #         print('key press filter')
-    #         return True
-    #     return super().eventFilter(obj, e)
-
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
             self.hide()
-        # if e.key() == Qt.Key_PageUp:
-        #     print('PARENT page up')
-        # elif e.key() == Qt.Key_PageDown:
-        #     print('PARENT page down')
         elif (e.key() == Qt.Key_Q) and (e.modifiers() == Qt.ControlModifier):
             self.close()
         elif (e.key() == Qt.Key_L) and (e.modifiers() == Qt.ControlModifier):
@@ -413,21 +322,7 @@ class MainWindow(QWidget):
             self.show()
 
 
-class XdoTool:
-    def get_active_window(self):
-        output = check_output(['xdotool', 'getactivewindow'])
-        return output.decode('utf8').strip()
-
-    def send_text(self, window, text):
-        check_output(['xdotool', 'windowfocus',
-                      '--sync', window, 'type', text])
-
-
 if __name__ == '__main__':
-    xdo = XdoTool()
-    active_window = xdo.get_active_window()
-    logging.info('active window: >%s<', active_window)
-
     app = QApplication(sys.argv)
     window = MainWindow(app)
 
