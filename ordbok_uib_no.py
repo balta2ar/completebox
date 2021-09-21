@@ -63,6 +63,7 @@ import bz2
 from os import makedirs
 from os.path import dirname, exists
 from urllib.parse import urlparse
+from json import loads
 
 from subprocess import check_output
 from requests import get
@@ -163,13 +164,34 @@ def spit(do_open, filename, content):
 
 
 class Suggestions:
-    pass
     # https://ordbok.uib.no/perl/lage_ordliste_liten_nr2000.cgi?spr=bokmaal&query=gam
 #
 # {query:'gam',
 # suggestions:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"],
 # data:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"]
 # }
+    TOP_COUNT = 5
+    def __init__(self, client, word):
+        self.word = word
+        self.items = loads(self.cleanup(client.get(self.get_url(word))))['suggestions']
+        self.top = self.items[:Suggestions.TOP_COUNT]
+
+    def cleanup(self, text):
+        text = '{}'[:1] + '\n' + text[text.index('\n')+1:]
+        #a = text.replace("'", '"')
+        # :2 because of the syntax parser in neovim plugin, if I leave one
+        # bracket open, it will incorrectly detect indentation
+        a = text
+        #a = re.sub('^{}'[:2] + 'query', '{"query"}', a)
+        a = re.sub('^suggestions', '"suggestions"', a, flags=re.MULTILINE)
+        a = re.sub('^data', '"data"', a, flags=re.MULTILINE)
+        return a
+
+    def get_url(self, query):
+        return 'https://ordbok.uib.no/perl/lage_ordliste_liten_nr2000.cgi?spr=bokmaal&query={0}'.format(query)
+
+    def __repr__(self):
+        return f'Suggestions(word={self.word}, count={len(self.items)}, top={self.top})'
 
 class Inflection:
     # https://ordbok.uib.no/perl/bob_hente_paradigme.cgi?lid=41772
@@ -212,12 +234,14 @@ def uniq(items, key):
 
 
 class Article:
+    # https://ordbok.uib.no/perl/ordbok.cgi?OPP=bra&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal
+    # <span class="oppslagsord b" id="22720">gi</span>
+    # <span class="oppsgramordklasse" onclick="vise_fullformer(&quot;8225&quot;,'bob')">adj.</span>
     def __init__(self, client, word):
+        self.word = word
         soup = BeautifulSoup(client.get(self.get_url(word)), features='lxml')
         parts = soup.find_all('span', {"class": "oppsgramordklasse"})
         parts = [PartOfSpeech(client, x) for x in parts]
-        logging.info('parts: %s', parts)
-
         self.parts = parts
         self.html = ''.join(uniq([x.inflection.html for x in self.parts], to_text))
 
@@ -225,10 +249,7 @@ class Article:
         return 'https://ordbok.uib.no/perl/ordbok.cgi?OPP={0}&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal'.format(word)
 
     def __repr__(self):
-        return f'Article(parts={self.parts})'
-    # https://ordbok.uib.no/perl/ordbok.cgi?OPP=bra&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal
-    # <span class="oppslagsord b" id="22720">gi</span>
-    # <span class="oppsgramordklasse" onclick="vise_fullformer(&quot;8225&quot;,'bob')">adj.</span>
+        return f'Article(word={self.word}, parts={self.parts})'
 
 
 class FetchResult:
@@ -259,13 +280,14 @@ class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.async_fetch = AsyncFetch(CachedHttpClient(HttpClient(), 'cache'))
+        self.client = CachedHttpClient(HttpClient(), 'cache')
+        self.async_fetch = AsyncFetch(self.client)
         self.async_fetch.ready.connect(self.on_fetch_ready)
 
         self.comboxBox = QComboBox(self)
         self.comboxBox.setEditable(True)
         self.comboxBox.setCurrentText('')
-        self.comboxBox.currentTextChanged.connect(self.onTextChanged)
+        self.comboxBox.currentTextChanged.connect(self.on_text_changed)
 
         font = QFont()
         font.setPointSize(font.pointSize() + ADD_TO_FONT_SIZE)
@@ -308,9 +330,11 @@ class MainWindow(QWidget):
     def set_text(self, text):
         self.browser.setText(STYLE + text)
 
-    def onTextChanged(self, text):
-        if text != '':
-            QTimer.singleShot(UPDATE_DELAY, lambda: self.update(text))
+    def on_text_changed(self, text):
+        if text == '':
+            return
+
+        QTimer.singleShot(UPDATE_DELAY, lambda: self.update(text))
 
     def update(self, old_text):
         if self.same_text(old_text):
@@ -325,6 +349,8 @@ class MainWindow(QWidget):
 
     def fetch(self, word):
         self.async_fetch.add(word)
+        suggestions = Suggestions(self.client, word)
+        print(suggestions)
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
