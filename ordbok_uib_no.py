@@ -163,6 +163,15 @@ def spit(do_open, filename, content):
         file_.write(content.encode())
 
 
+def to_text(html):
+    return BeautifulSoup(html, features='lxml').text
+
+
+def uniq(items, key):
+    seen = set()
+    return [x for x in items if not (key(x) in seen or seen.add(key(x)))]
+
+
 class Suggestions:
     # https://ordbok.uib.no/perl/lage_ordliste_liten_nr2000.cgi?spr=bokmaal&query=gam
 #
@@ -173,7 +182,8 @@ class Suggestions:
     TOP_COUNT = 5
     def __init__(self, client, word):
         self.word = word
-        self.items = loads(self.cleanup(client.get(self.get_url(word))))['suggestions']
+        items = loads(self.cleanup(client.get(self.get_url(word)))).get('suggestions', [])
+        self.items = uniq(items, lambda s: s.lower())
         self.top = self.items[:Suggestions.TOP_COUNT]
 
     def cleanup(self, text):
@@ -224,15 +234,6 @@ class PartOfSpeech:
         return f'PartOfSpeech(name="{self.name}", lid={self.lid}, inflection={self.inflection})'
 
 
-def to_text(html):
-    return BeautifulSoup(html, features='lxml').text
-
-
-def uniq(items, key):
-    seen = set()
-    return [x for x in items if not (key(x) in seen or seen.add(key(x)))]
-
-
 class Article:
     # https://ordbok.uib.no/perl/ordbok.cgi?OPP=bra&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal
     # <span class="oppslagsord b" id="22720">gi</span>
@@ -258,8 +259,8 @@ class AsyncFetch(QObject):
         super(AsyncFetch, self).__init__()
         self.client = client
         self.queue = Queue()
-        self.thread = Thread(target=self._serve, daemon=True)
-        self.thread.start()
+        for _ in range(10):
+            Thread(target=self._serve, daemon=True).start()
     def add(self, task):
         self.queue.put(task)
     def _serve(self):
@@ -320,6 +321,12 @@ class MainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
+    def suggest(self, words):
+        completer = QCompleter(words, self)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.comboxBox.setCompleter(completer)
+        completer.complete()
+
     def set_text(self, text):
         self.browser.setText(STYLE + text)
 
@@ -338,13 +345,15 @@ class MainWindow(QWidget):
         if isinstance(result, Article):
             if self.same_text(result.word) and result.parts:
                 self.set_text(result.html)
+        elif isinstance(result, Suggestions):
+            print(result)
+            self.suggest(result.top)
         else:
             logging.warn('unknown fetch result: %s', result)
 
     def fetch(self, word):
         self.async_fetch.add(lambda c: Article(c, word))
-        #suggestions = Suggestions(self.client, word)
-        #print(suggestions)
+        self.async_fetch.add(lambda c: Suggestions(c, word))
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
