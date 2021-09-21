@@ -81,7 +81,7 @@ logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 800
-UPDATE_DELAY = 500
+UPDATE_DELAY = 200
 ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
 RX_SPACES = re.compile(r'\s+')
 ADD_TO_FONT_SIZE = 6
@@ -264,7 +264,6 @@ class MainWindow(QWidget):
 
         self.comboxBox = QComboBox(self)
         self.comboxBox.setEditable(True)
-        self.comboxBox.setMaximumWidth(WINDOW_WIDTH)
         self.comboxBox.setCurrentText('')
         self.comboxBox.currentTextChanged.connect(self.onTextChanged)
 
@@ -274,8 +273,6 @@ class MainWindow(QWidget):
 
         self.browser = QTextBrowser(self)
         self.browser.setText(STYLE + HTML)
-        self.browser.setMinimumWidth(WINDOW_WIDTH)
-        self.browser.setMinimumHeight(WINDOW_HEIGHT)
         self.browser.show()
 
         mainLayout = QVBoxLayout(self)
