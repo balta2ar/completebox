@@ -139,7 +139,7 @@ class CachedHttpClient:
         return '{0}/{1}/{2}'.format(dirname(__file__), self.dirname, key)
 
     def cleanup(self, url):
-        return re.sub(r'[^a-zA-Z0-9-_]', '', url)
+        return re.sub(r'\W+', '', url)
 
     def get_key(self, url):
         parsed = urlparse(url)
