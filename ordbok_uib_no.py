@@ -4,6 +4,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.request import urlopen
 from threading import Thread
+from queue import Queue
 
 
 class WatchDog:
@@ -72,6 +73,7 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
                              QSystemTrayIcon, QMenu, QAction)
 from PyQt5.QtGui import QIcon, QFont, QStandardItemModel, QKeyEvent
 from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer, QObject, QEvent
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.DEBUG)
@@ -79,7 +81,6 @@ logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 800
-#MIN_HEIGHT = 800
 UPDATE_DELAY = 500
 ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
 RX_SPACES = re.compile(r'\s+')
@@ -218,8 +219,7 @@ class Article:
         logging.info('parts: %s', parts)
 
         self.parts = parts
-        htmls = uniq([x.inflection.html for x in self.parts], to_text)
-        self.html = ''.join(htmls)
+        self.html = ''.join(uniq([x.inflection.html for x in self.parts], to_text))
 
     def get_url(self, word: str) -> str:
         return 'https://ordbok.uib.no/perl/ordbok.cgi?OPP={0}&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal'.format(word)
@@ -231,10 +231,36 @@ class Article:
     # <span class="oppsgramordklasse" onclick="vise_fullformer(&quot;8225&quot;,'bob')">adj.</span>
 
 
+class FetchResult:
+    def __init__(self, word, article):
+        self.word = word
+        self.article = article
+
+class AsyncFetch(QObject):
+    ready = pyqtSignal(FetchResult)
+    def __init__(self, client):
+        super(AsyncFetch, self).__init__()
+        self.client = client
+        self.queue = Queue()
+        self.thread = Thread(target=self._serve, daemon=True)
+        self.thread.start()
+    def add(self, word):
+        self.queue.put(word)
+    def _serve(self):
+        while True:
+            word = self.queue.get()
+            logging.info('fetch "%s"', word)
+            article = Article(self.client, word)
+            print(article)
+            self.ready.emit(FetchResult(word, article))
+
+
 class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
         self.app = app
+        self.async_fetch = AsyncFetch(CachedHttpClient(HttpClient(), 'cache'))
+        self.async_fetch.ready.connect(self.on_fetch_ready)
 
         self.comboxBox = QComboBox(self)
         self.comboxBox.setEditable(True)
@@ -290,8 +316,28 @@ class MainWindow(QWidget):
             QTimer.singleShot(UPDATE_DELAY, lambda: self.update(text))
 
     def update(self, old_text):
-        if self.text() == old_text:
+        if self.same_text(old_text):
             self.fetch(old_text)
+
+    @pyqtSlot(FetchResult)
+    def on_fetch_ready(self, result: FetchResult):
+        if not self.same_text(result.word):
+            return
+        if result.article.parts:
+            self.set_text(result.article.html)
+
+    def fetch(self, word):
+        self.async_fetch.add(word)
+
+    def onTrayActivated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self.show()
+
+    def same_text(self, word):
+        return word == self.text()
+
+    def text(self):
+        return self.comboxBox.currentText()
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Escape:
@@ -304,22 +350,6 @@ class MainWindow(QWidget):
         elif e.key() == Qt.Key_Return:
             self.fetch(self.text())
 
-    def text(self):
-        return self.comboxBox.currentText()
-
-    def fetch(self, word):
-        logging.info('fetch "%s"', word)
-
-        client = CachedHttpClient(HttpClient(), 'cache')
-        article = Article(client, word)
-        print(article)
-
-        if article.parts:
-            self.set_text(article.html)
-
-    def onTrayActivated(self, reason):
-        if reason == QSystemTrayIcon.Trigger:
-            self.show()
 
 
 if __name__ == '__main__':
