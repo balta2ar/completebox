@@ -65,15 +65,14 @@ from os.path import dirname, exists
 from urllib.parse import urlparse
 from json import loads
 
-from subprocess import check_output
 from requests import get
 from bs4 import BeautifulSoup
 
-from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QVBoxLayout,
+from PyQt5.QtWidgets import (QApplication, QComboBox, QVBoxLayout,
                              QWidget, QDesktopWidget, QCompleter, QTextBrowser,
                              QSystemTrayIcon, QMenu, QAction)
-from PyQt5.QtGui import QIcon, QFont, QStandardItemModel, QKeyEvent
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp, QTimer, QObject, QEvent
+from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtCore import Qt, QTimer, QObject
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
@@ -84,7 +83,6 @@ WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 800
 UPDATE_DELAY = 200
 ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
-RX_SPACES = re.compile(r'\s+')
 ADD_TO_FONT_SIZE = 6
 
 STYLE = '''
@@ -174,11 +172,11 @@ def uniq(items, key):
 
 class Suggestions:
     # https://ordbok.uib.no/perl/lage_ordliste_liten_nr2000.cgi?spr=bokmaal&query=gam
-#
-# {query:'gam',
-# suggestions:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"],
-# data:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"]
-# }
+    #
+    # {query:'gam',
+    # suggestions:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"],
+    # data:["gaman","gamasje","gambe","gambier","gambisk","gambit","gamble","gambler","game","game","gamet","gametofytt","gamla","gamle-","gamleby","gamlefar","gamleheim","gamlehjem","gamlekjжreste","gamlemor","gamlen","gamlestev","gamletid","gamleеr","gamling","gamma","gammaglobulin","gammal","gammaldags","gammaldans","gammaldansk","gammaldansk","gammalengelsk","gammalgresk","gammalkjent","gammalkjжreste","gammalkommunist","gammalmannsaktig","gammalmodig","gammalnorsk","gammalnorsk","gammalost","gammalrosa","gammalstev","gammaltestamentlig","gammaltid","gammalvoren","gammastrеle","gammastrеling","gamme","gammel","gammel jomfru","gammel norsk mil","gammel som alle haugene","gammeldags","gammeldans","gammeldansk","gammeldansk","gammelengelsk","gammelgresk","gammelkjent","gammelkjжreste","gammelkommunist","gammelmannsaktig","gammelmodig","gammelnorsk","gammelnorsk","gammelost","gammelrosa","gammelstev","gammeltestamentlig","gammeltid","gammelvoren","gammen","gamp","gampe"]
+    # }
     TOP_COUNT = 5
     def __init__(self, client, word):
         self.word = word
@@ -233,7 +231,6 @@ class PartOfSpeech:
     def __repr__(self):
         return f'PartOfSpeech(name="{self.name}", lid={self.lid}, inflection={self.inflection})'
 
-
 class Article:
     # https://ordbok.uib.no/perl/ordbok.cgi?OPP=bra&ant_bokmaal=5&ant_nynorsk=5&bokmaal=+&ordbok=bokmaal
     # <span class="oppslagsord b" id="22720">gi</span>
@@ -274,8 +271,7 @@ class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.client = CachedHttpClient(HttpClient(), 'cache')
-        self.async_fetch = AsyncFetch(self.client)
+        self.async_fetch = AsyncFetch(CachedHttpClient(HttpClient(), 'cache'))
         self.async_fetch.ready.connect(self.on_fetch_ready)
 
         self.comboxBox = QComboBox(self)
@@ -346,14 +342,15 @@ class MainWindow(QWidget):
             if self.same_text(result.word) and result.parts:
                 self.set_text(result.html)
         elif isinstance(result, Suggestions):
-            print(result)
-            self.suggest(result.top)
+            if self.same_text(result.word) and result.top:
+                print(result)
+                self.suggest(result.top)
         else:
             logging.warn('unknown fetch result: %s', result)
 
     def fetch(self, word):
-        self.async_fetch.add(lambda c: Article(c, word))
-        self.async_fetch.add(lambda c: Suggestions(c, word))
+        self.async_fetch.add(lambda client: Article(client, word))
+        self.async_fetch.add(lambda client: Suggestions(client, word))
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
@@ -375,7 +372,6 @@ class MainWindow(QWidget):
             self.comboxBox.setFocus()
         elif e.key() == Qt.Key_Return:
             self.fetch(self.text())
-
 
 
 if __name__ == '__main__':
