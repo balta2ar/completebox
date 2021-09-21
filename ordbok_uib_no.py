@@ -252,28 +252,21 @@ class Article:
         return f'Article(word={self.word}, parts={self.parts})'
 
 
-class FetchResult:
-    def __init__(self, word, article):
-        self.word = word
-        self.article = article
-
 class AsyncFetch(QObject):
-    ready = pyqtSignal(FetchResult)
+    ready = pyqtSignal(object)
     def __init__(self, client):
         super(AsyncFetch, self).__init__()
         self.client = client
         self.queue = Queue()
         self.thread = Thread(target=self._serve, daemon=True)
         self.thread.start()
-    def add(self, word):
-        self.queue.put(word)
+    def add(self, task):
+        self.queue.put(task)
     def _serve(self):
         while True:
-            word = self.queue.get()
-            logging.info('fetch "%s"', word)
-            article = Article(self.client, word)
-            print(article)
-            self.ready.emit(FetchResult(word, article))
+            task = self.queue.get()
+            result = task(self.client)
+            self.ready.emit(result)
 
 
 class MainWindow(QWidget):
@@ -340,17 +333,18 @@ class MainWindow(QWidget):
         if self.same_text(old_text):
             self.fetch(old_text)
 
-    @pyqtSlot(FetchResult)
-    def on_fetch_ready(self, result: FetchResult):
-        if not self.same_text(result.word):
-            return
-        if result.article.parts:
-            self.set_text(result.article.html)
+    @pyqtSlot(object)
+    def on_fetch_ready(self, result: object):
+        if isinstance(result, Article):
+            if self.same_text(result.word) and result.parts:
+                self.set_text(result.html)
+        else:
+            logging.warn('unknown fetch result: %s', result)
 
     def fetch(self, word):
-        self.async_fetch.add(word)
-        suggestions = Suggestions(self.client, word)
-        print(suggestions)
+        self.async_fetch.add(lambda c: Article(c, word))
+        #suggestions = Suggestions(self.client, word)
+        #print(suggestions)
 
     def onTrayActivated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
