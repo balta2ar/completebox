@@ -313,7 +313,9 @@ class MainWindow(QWidget):
 
     def center(self):
         qr = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
+        desktop = QApplication.desktop()
+        screen = desktop.screenNumber(desktop.cursor().pos())
+        cp = desktop.screenGeometry(screen).center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
@@ -396,3 +398,4 @@ if __name__ == '__main__':
     dog.observe(window.activate)
 
     result = app.exec()
+
