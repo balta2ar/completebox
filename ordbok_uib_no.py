@@ -152,12 +152,10 @@ class CachedHttpClient:
     def get_path(self, key):
         return '{0}/{1}/{2}'.format(dirname(__file__), self.dirname, key)
 
-    def cleanup(self, url):
-        return normpath(re.sub(r'\W+', '/', url))
-
     def get_key(self, url):
+        J = lambda x: re.sub(r'\W+', '', x)
         p = urlparse(url)
-        return self.cleanup('/'.join([p.hostname, p.path, p.query]))
+        return '/'.join([J(p.hostname), J(p.path), J(p.query)])
 
 
 def slurp(do_open, filename):
