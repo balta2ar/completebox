@@ -61,7 +61,7 @@ import logging
 import re
 import bz2
 from os import makedirs
-from os.path import dirname, exists
+from os.path import dirname, exists, normpath
 from urllib.parse import urlparse
 from json import loads
 
@@ -129,7 +129,8 @@ HTML = '''
 class HttpClient:
     def get(self, url):
         logging.info('http get "%s"', url)
-        result = get(url)
+        headers = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'}
+        result = get(url, headers=headers)
         result.raise_for_status()
         return result.text
 
@@ -152,11 +153,11 @@ class CachedHttpClient:
         return '{0}/{1}/{2}'.format(dirname(__file__), self.dirname, key)
 
     def cleanup(self, url):
-        return re.sub(r'\W+', '', url)
+        return normpath(re.sub(r'\W+', '/', url))
 
     def get_key(self, url):
-        parsed = urlparse(url)
-        return self.cleanup(parsed.query)
+        p = urlparse(url)
+        return self.cleanup('/'.join([p.hostname, p.path, p.query]))
 
 
 def slurp(do_open, filename):
