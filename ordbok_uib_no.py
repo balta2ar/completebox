@@ -431,11 +431,33 @@ class GoldenDictProxy:
     def serve(self):
         logging.info('Starting GoldenDictProxy on %s:%s', self.host, self.port)
         self.app.route('/ordbok/inflect/<word>', methods=['GET'])(self.route_ordbok_inflect)
+        self.app.route('/glosbe/noru/<word>', methods=['GET'])(self.route_glosbe_noru)
         self.app.route('/static/css/ord-concatenated.css', methods=['GET'])(self.route_css)
-        self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
+        self.app.run(host=self.host, port=self.port, debug=True, use_reloader=False)
+    def route_glosbe_noru(self, word):
+        url = 'https://nb.glosbe.com/nb/ru/{0}'.format(word)
+        result = self.client.get(url)
+        #https://nb.glosbe.com/nb/ru/gift
+        return result
     def route_ordbok_inflect(self, word):
         logging.info('Inflect: %s', word)
-        return self.format(Article(self.client, word).html)
+        r = Response(open('barn.html').read())
+        r.headers['age'] = '0'
+        r.headers['cache-control'] = 'public,must-revalidate,max-age=600,s-maxage=0'
+        r.headers['content-type'] = 'text/html; charset=utf-8'
+        r.headers['server'] = 'nginx'
+        r.headers['via'] = '1.1 varnish-v4'
+        r.headers['x-cache'] = 'MISS'
+        r.headers['x-cache-hits'] = '0'
+        r.headers['x-debug-max-age-sec'] = '43200'
+        r.headers['x-debugdb'] = 'ok'
+        r.headers['x-varnish'] = '28182065'
+        #date: Sun, 03 Oct 2021 14:24:58 GMT
+        #last-modified: Sun, 03 Oct 2021 14:24:58 GMT
+        from datetime import datetime, timezone
+        r.headers['last-modified'] = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT') #r.headers['date']
+        return r
+        #return self.format(Article(self.client, word).html)
         #return 'word: {0}'.format(word)
     def format(self, html):
         return PRELUDE.format(html)

@@ -58,7 +58,7 @@ text-decoration: underline;
 }
 #hode {
 background-color: #D3DDE9;
-background: url("/static/img/hode-bakgrund.png");
+/*background: url("/static/img/hode-bakgrund.png");*/
 background-position: left top;
 background-repeat: no-repeat;
 height: 100px;
