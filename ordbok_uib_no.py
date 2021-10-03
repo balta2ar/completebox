@@ -85,6 +85,20 @@ UPDATE_DELAY = 200
 ICON_FILENAME = dirname(__file__) + '/ordbok_uib_no.png'
 ADD_TO_FONT_SIZE = 6
 
+PROXY_STYLE = '''
+<style>
+* {
+margin: 0;
+padding: 0;
+font-size: 100%;
+}
+body {
+background-color: white;
+color: black;
+font-family: sans-serif;
+}
+</style>
+'''
 STYLE = '''
 <style>
 th {
@@ -376,7 +390,83 @@ class MainWindow(QWidget):
             self.fetch(self.text())
 
 
+PRELUDE = '''
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Bokmålsordboka | Nynorskordboka</title>
+<meta name="description" content="" />
+<meta name="keywords" content="" />
+
+<meta name="robots" content="index,follow" />
+<meta name="revisit-after" content="14 days" />
+<link rel="shortcut icon" href="/apple-touch-icon.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+<script type="text/javascript" src="/js/jquery-1.7.2.min.js"></script>
+<script type="text/javascript" src="/js/jquery-ui-1.8.22.custom.min.js"></script>
+<script type="text/javascript" src="/js/jquery.autocomplete-1.1.3/jquery.autocomplete.js"></script>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, target-densityDpi=160dpi, initial-scale=1">
+<meta name="MobileOptimized" content="width">
+<meta name="HandheldFriendly" content="true">
+<link href="/static/css/ord-concatenated.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+{0}
+</body>
+</html>
+'''
+
+from flask import Flask, Response
+class GoldenDictProxy:
+    def __init__(self, client, host, port):
+        self.client = client
+        self.host = host
+        self.port = port
+        self.app = Flask(__name__)
+    def serve_background(self):
+        Thread(target=self.serve, daemon=True).start()
+    def serve(self):
+        logging.info('Starting GoldenDictProxy on %s:%s', self.host, self.port)
+        self.app.route('/ordbok/inflect/<word>', methods=['GET'])(self.route_ordbok_inflect)
+        self.app.route('/static/css/ord-concatenated.css', methods=['GET'])(self.route_css)
+        self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
+    def route_ordbok_inflect(self, word):
+        logging.info('Inflect: %s', word)
+        return self.format(Article(self.client, word).html)
+        #return 'word: {0}'.format(word)
+    def format(self, html):
+        return PRELUDE.format(html)
+    def route_css(self):
+        body = open('./ord-concatenated.css').read()
+        return Response(body, mimetype='text/css')
+
+        # result = '<html><head>{0}</head><body>{1}</body></html>'.format(PROXY_STYLE, html)
+        # return pretty(result)
+
+        #return '<html><head>{0}</head><body>{1}</body></html>'.format(STYLE, html)
+        #return '{0}{1}'.format(STYLE, html)
+        #return '{0}'.format(html)
+
+        # x = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
+        # x += '<html xmlns="http://www.w3.org/1999/xhtml">'
+        # x += '<body>'
+        # x += html
+        # x += '</body>'
+        # x += '</html>'
+        # return x
+
+def pretty(html):
+    return BeautifulSoup(html, features='lxml').prettify()
+
+
 if __name__ == '__main__':
+    client = CachedHttpClient(HttpClient(), 'cache')
+    golden_dict_proxy = GoldenDictProxy(client, 'localhost', 5660)
+    golden_dict_proxy.serve_background()
+
     app = QApplication(sys.argv)
     window = MainWindow(app)
 
